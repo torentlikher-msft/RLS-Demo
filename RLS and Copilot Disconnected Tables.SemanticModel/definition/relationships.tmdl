@@ -1,0 +1,32 @@
+relationship 'Encounters_Date Key_Date_Date Key'
+	fromColumn: Encounters.'Date Key'
+	toColumn: Date.'Date Key'
+
+relationship 'Encounters_Patient Key_Patient_Patient Key'
+	fromColumn: Encounters.'Patient Key'
+	toColumn: Patient.'Patient Key'
+
+relationship 'Encounters_Provider Key_Provider_Provider Key'
+	fromColumn: Encounters.'Provider Key'
+	toColumn: Provider.'Provider Key'
+
+relationship 'Encounters_Payer Key_Payer_Payer Key'
+	fromColumn: Encounters.'Payer Key'
+	toColumn: Payer.'Payer Key'
+
+relationship 'Encounters_Diagnosis Key_Diagnosis_Diagnosis Key'
+	fromColumn: Encounters.'Diagnosis Key'
+	toColumn: Diagnosis.'Diagnosis Key'
+
+relationship 'Encounters_Encounter Type Key_Encounter Type_Encounter Type Key'
+	fromColumn: Encounters.'Encounter Type Key'
+	toColumn: 'Encounter Type'.'Encounter Type Key'
+
+relationship 'Encounters_Discharge Disposition Key_Discharge Disposition_Discharge Disposition Key'
+	fromColumn: Encounters.'Discharge Disposition Key'
+	toColumn: 'Discharge Disposition'.'Discharge Disposition Key'
+
+relationship 'Encounters_Department Key_Department_Department Key'
+	fromColumn: Encounters.'Department Key'
+	toColumn: Department.'Department Key'
+

@@ -1,0 +1,74 @@
+/// Alternative security mapping with an All Access override flag, kept for reference from the RLS design comparison. No role currently uses it to filter data; the Department Access role restricts it to the signed-in user's own rows so access lists aren't exposed. Hidden; not for reporting.
+table 'User Department Access (Override)'
+	lineageTag: f70e2280-8343-4134-956b-c3b73168847a
+
+	/// User principal name (UPN, typically the sign-in email address) of a person granted access. Compared against USERPRINCIPALNAME() by the Department Access (Override) row-level security role; matching is case-insensitive. Includes 6 named sample users plus 2,000 generated users (facility directors, department managers, regional leaders, enterprise analysts).
+	column 'User Email'
+		dataType: string
+		lineageTag: 75e13689-3bc4-4202-b09a-ccadd3a18251
+		sourceColumn: User Email
+
+		changedProperty = IsHidden
+
+	/// All-access override flag. When TRUE on any row for a user, the Department Access (Override) role grants every department at every facility, including ones added later. FALSE for normal grants.
+	column 'All Access'
+		dataType: boolean
+		lineageTag: 3da3b27b-881f-4808-9769-0a3a46077f22
+		sourceColumn: All Access
+
+		changedProperty = IsHidden
+
+	/// Department Key (department at a facility, 1 to 2,500) that the user may see. One row per user per granted key; blank on all-access rows.
+	column 'Granted Department Key'
+		dataType: int64
+		lineageTag: c3d65cda-a7fa-49ca-94ae-41a5d3b6e420
+		summarizeBy: none
+		sourceColumn: Granted Department Key
+
+		changedProperty = IsHidden
+
+	partition 'User Department Access (Override)' = m
+		mode: import
+		source =
+				let
+				    FacilityCount = 250,
+				    DepartmentCount = 10,
+				    // Department Key = (Facility Number - 1) * 10 + department position (1 Cardiology ... 10 Pediatrics); matches the Department query
+				    Key = (f as number, d as number) as number => (f - 1) * DepartmentCount + d,
+				    AllFacilities = List.Numbers(1, FacilityCount),
+				    AllKeys = List.Numbers(1, FacilityCount * DepartmentCount),
+				    StateOf = (f as number) as number => Number.Mod(Number.IntegerDivide(f - 1, 5), 10),
+				    FacilitiesInState = (s as number) as list => List.Select(AllFacilities, (f) => StateOf(f) = s),
+				    DeptAcross = (depts as list, facilities as list) as list =>
+				        List.Sort(List.Combine(List.Transform(facilities, (f) => List.Transform(depts, (d) => Key(f, d))))),
+				    // Sample users referenced by the RLS Test report page
+				    SampleUsers = {
+				        {"executive@contoso.com", "All", AllKeys},
+				        {"cardiology.manager@contoso.com", "Department", DeptAcross({1}, AllFacilities)},
+				        {"ed.director@contoso.com", "Department", DeptAcross({2}, AllFacilities)},
+				        {"primarycare.director@contoso.com", "Department", DeptAcross({3, 6, 10}, AllFacilities)},
+				        {"surgery.director@contoso.com", "Department", DeptAcross({5, 9}, AllFacilities)},
+				        {"specialty.analyst@contoso.com", "Department", DeptAcross({1, 4, 7, 8}, AllFacilities)}
+				    },
+				    // Generated users: 60% facility directors (10 keys), 20% department managers in one state (25 keys),
+				    // 17.5% regional leaders for one state (250 keys), 2.5% enterprise analysts (all 2,500 keys / all-access)
+				    GeneratedUserCount = 2000,
+				    GeneratedUser = (u as number) as list =>
+				        let
+				            Slot = Number.Mod(u, 40),
+				            Id = Text.PadStart(Text.From(u), 4, "0")
+				        in
+				            if Slot < 24 then {"facility.director." & Id & "@contoso.com", "Facility", DeptAcross(List.Numbers(1, DepartmentCount), {Number.Mod(u * 7, FacilityCount) + 1})}
+				            else if Slot < 32 then {"department.manager." & Id & "@contoso.com", "Department", DeptAcross({Number.Mod(u, DepartmentCount) + 1}, FacilitiesInState(Number.Mod(Number.IntegerDivide(u, 10), 10)))}
+				            else if Slot < 39 then {"regional.leader." & Id & "@contoso.com", "Region", DeptAcross(List.Numbers(1, DepartmentCount), FacilitiesInState(Number.Mod(u, 10)))}
+				            else {"enterprise.analyst." & Id & "@contoso.com", "All", AllKeys},
+				    Users = SampleUsers & List.Transform(List.Numbers(1, GeneratedUserCount), GeneratedUser),
+				    Rows = List.Combine(List.Transform(Users, (x) => if x{1} = "All" then {{x{0}, null, true}} else List.Transform(x{2}, (k) => {x{0}, k, false}))),
+				    Result = Table.FromRows(Rows, type table [#"User Email" = text, #"Granted Department Key" = nullable Int64.Type, #"All Access" = logical])
+				in
+				    Result
+
+	changedProperty = IsHidden
+
+	annotation PBI_ResultType = Table
+

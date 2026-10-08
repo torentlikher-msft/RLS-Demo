@@ -1,0 +1,42 @@
+/// Encounter type dimension at one row per visit classification (8 types) grouped into care settings. Use it to distinguish inpatient admissions, emergency department visits, observation stays, outpatient and ambulatory visits, telehealth, and home health.
+table 'Encounter Type'
+	lineageTag: e74a9d82-f646-47bd-bc6f-40982b58fe14
+
+	/// Encounter type surrogate key used only to relate Encounter Type to Encounters.
+	column 'Encounter Type Key'
+		dataType: int64
+		isHidden
+		isUnique
+		lineageTag: 78e62c2a-67b2-477d-a4a3-5534090904a8
+		summarizeBy: none
+		sourceColumn: Encounter Type Key
+
+	/// Visit classification: Inpatient (admission), Emergency (emergency department or ER visit), Observation, Outpatient, Ambulatory Surgery, Urgent Care, Telehealth (virtual visit), or Home Health. Only Inpatient and Observation have a length of stay.
+	column 'Encounter Type'
+		dataType: string
+		lineageTag: f24fc480-1516-4252-b369-6291101812c9
+		isDefaultLabel
+		sourceColumn: Encounter Type
+
+	/// Broader delivery setting grouping encounter types: Acute Care (Inpatient, Observation), Emergency Care, Ambulatory Care (Outpatient, Ambulatory Surgery, Urgent Care), Virtual Care (Telehealth), and Home-Based Care.
+	column 'Care Setting'
+		dataType: string
+		lineageTag: c9deff31-1504-4ed9-be65-b3f3bc59c701
+		sourceColumn: Care Setting
+
+	/// Care delivery drill path from Care Setting down to Encounter Type.
+	hierarchy 'Care Setting Hierarchy'
+		lineageTag: 217c8b2e-e29f-4001-968b-55e7bbc45465
+
+		level 'Care Setting'
+			lineageTag: d752d61f-dee8-450f-8181-c5d0eeb49032
+			column: 'Care Setting'
+
+		level 'Encounter Type'
+			lineageTag: 52e76ec4-0d14-4c1b-972c-93ff641a57a6
+			column: 'Encounter Type'
+
+	partition 'Encounter Type' = m
+		mode: import
+		source = #table(type table [#"Encounter Type Key" = Int64.Type, #"Encounter Type" = text, #"Care Setting" = text], {{1, "Inpatient", "Acute Care"}, {2, "Emergency", "Emergency Care"}, {3, "Observation", "Acute Care"}, {4, "Outpatient", "Ambulatory Care"}, {5, "Ambulatory Surgery", "Ambulatory Care"}, {6, "Urgent Care", "Ambulatory Care"}, {7, "Telehealth", "Virtual Care"}, {8, "Home Health", "Home-Based Care"}})
+

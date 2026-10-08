@@ -1,0 +1,44 @@
+/// Rendering provider dimension at one row per synthetic clinician (5,000 providers). Use it to compare encounter volume, allowed amount, length of stay, and readmissions by individual provider, clinical specialty, and provider type.
+table Provider
+	lineageTag: 6bc50889-6318-492a-a90d-0b3aaf458115
+
+	/// Synthetic provider surrogate key used only to relate Provider to Encounters. Not a National Provider Identifier (NPI).
+	column 'Provider Key'
+		dataType: int64
+		isHidden
+		isUnique
+		lineageTag: 82dac07e-bf49-4f48-808a-38c84aaaeae1
+		summarizeBy: none
+		sourceColumn: Provider Key
+
+	/// Display name of the rendering provider (clinician, doctor, or practitioner) responsible for the encounter, formatted Provider 0001 through Provider 5000. Synthetic; does not identify real clinicians.
+	column 'Provider Name'
+		dataType: string
+		lineageTag: ef885e9e-1e52-42e9-a6f5-675c3373fd03
+		isDefaultLabel
+		sourceColumn: Provider Name
+
+	/// Primary clinical specialty of the provider, such as Cardiology, Emergency Medicine, Family Medicine, Oncology, Orthopedics, or Pediatrics. Use for service-line analysis by physician specialty.
+	column 'Provider Specialty'
+		dataType: string
+		lineageTag: 2e3ca93a-7941-4c16-905e-bc33d0041df9
+		sourceColumn: Provider Specialty
+
+	/// Credential grouping of the provider: Physician (MD or DO) or Advanced Practice Clinician (nurse practitioner or physician assistant).
+	column 'Provider Type'
+		dataType: string
+		lineageTag: 38c4a4b6-e739-4027-b591-bc007a76e6f7
+		sourceColumn: Provider Type
+
+	partition Provider = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromList(List.Numbers(1, 5000), Splitter.SplitByNothing(), {"Provider Key"}),
+				    Typed = Table.TransformColumnTypes(Source, {{"Provider Key", Int64.Type}}),
+				    AddProvider = Table.AddColumn(Typed, "Provider Name", each "Provider " & Text.PadStart(Text.From([Provider Key]), 4, "0"), type text),
+				    AddSpecialty = Table.AddColumn(AddProvider, "Provider Specialty", each {"Cardiology", "Emergency Medicine", "Family Medicine", "Gastroenterology", "General Surgery", "Internal Medicine", "Neurology", "Oncology", "Orthopedics", "Pediatrics"}{Number.Mod([Provider Key] - 1, 10)}, type text),
+				    AddType = Table.AddColumn(AddSpecialty, "Provider Type", each if Number.Mod([Provider Key], 5) = 0 then "Advanced Practice Clinician" else "Physician", type text)
+				in
+				    AddType
+

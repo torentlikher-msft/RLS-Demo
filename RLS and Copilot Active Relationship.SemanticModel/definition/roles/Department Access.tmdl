@@ -1,0 +1,14 @@
+/// Department-based row-level security. Filters User Department Access to the signed-in user's rows (User Email = USERPRINCIPALNAME()). The bidirectional relationship between User Department Access and Department, with security filtering applied in both directions, carries that filter to Department and from there to Encounters, so members see only encounters in their granted department-at-facility keys. Users with no rows see no data. Role membership is assigned in the Power BI service.
+role 'Department Access'
+	modelPermission: read
+
+	tablePermission 'User Department Access' = 'User Department Access'[User Email] = USERPRINCIPALNAME()
+
+	tablePermission 'User Department Access (Delimited)' = 'User Department Access (Delimited)'[User Email] = USERPRINCIPALNAME()
+
+	tablePermission 'User Department Access (Override)' = 'User Department Access (Override)'[User Email] = USERPRINCIPALNAME()
+
+	tablePermission 'User Department Access (Delimited Override)' = 'User Department Access (Delimited Override)'[User Email] = USERPRINCIPALNAME()
+
+	annotation PBI_Id = 79107f05c7d4431b80acde0a96b9577f
+

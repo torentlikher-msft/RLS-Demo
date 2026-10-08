@@ -1,0 +1,34 @@
+/// Healthcare patient encounter analytics semantic model in a star schema. The central Encounters fact table holds one row per synthetic patient encounter and relates to Date, Patient, Provider, Department (department at a facility, 2,500 rows), Payer, Diagnosis, Encounter Type, and Discharge Disposition dimensions. All explicit DAX measures live in the _Measures table. Row-level security uses one role, Department Access, which filters the User Department Access bridge table to the signed-in user; a bidirectional security relationship carries that filter to Department and Encounters. Data is deterministic and synthetic (no real patients); fact volume is controlled by the Power Query parameter Encounter Row Count.
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+	valueFilterBehavior: independent
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 0
+
+annotation PBI_ProTooling = ["MCP-PBIModeling","DevMode"]
+
+annotation PBI_QueryOrder = ["Date","Patient","Provider","Payer","Diagnosis","Encounter Type","Discharge Disposition","Encounters","_Measures","Department","User Department Access","Encounter Row Count"]
+
+ref table Date
+ref table Patient
+ref table Provider
+ref table Payer
+ref table Diagnosis
+ref table 'Encounter Type'
+ref table 'Discharge Disposition'
+ref table Encounters
+ref table _Measures
+ref table Department
+ref table 'User Department Access'
+
+ref role 'Department Access'
+ref role 'All Access'
+
+ref cultureInfo en-US
+

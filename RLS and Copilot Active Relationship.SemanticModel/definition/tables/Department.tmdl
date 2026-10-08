@@ -1,0 +1,152 @@
+/// Department dimension at one row per clinical department at a specific facility (10 departments x 250 facilities = 2,500 rows). Combines the clinical department (name, code, service line) with the facility where it operates (facility name, type, city, state). Each encounter belongs to the department of its rendering provider at the facility where care was delivered. This is the security boundary for row-level security: the Department Access role filters User Department Access to the signed-in user's rows, and that filter flows through a bidirectional relationship (security filter applied in both directions) to Department, and from Department to Encounters.
+table Department
+	lineageTag: 96d6c907-9d42-479f-99e8-dc5c25c3afac
+
+	/// Surrogate key for a department at a facility, calculated as (facility number - 1) x 10 + department position (1 Cardiology through 10 Pediatrics), giving values 1 to 2,500. Relates Department to Encounters and is the key the RLS roles grant access to. Hidden.
+	column 'Department Key'
+		dataType: int64
+		isHidden
+		isUnique
+		lineageTag: 8c1d1ab1-4049-4dfb-82e4-46fa492beddf
+		summarizeBy: none
+		sourceColumn: Department Key
+
+	/// Name of the clinical department (specialty or service) responsible for the encounter, such as Cardiology, Emergency Medicine, Oncology, or Pediatrics. The same department name appears at every facility; use Facility Department to identify one department at one facility. Always matches the rendering provider's Provider Specialty.
+	column 'Department Name'
+		dataType: string
+		lineageTag: b2dff570-471c-448f-b7ee-6cae6f930e98
+		summarizeBy: none
+		sourceColumn: Department Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Short code for the department used in operational systems: CARD (Cardiology), ED (Emergency Department / Emergency Medicine), FM (Family Medicine), GI (Gastroenterology), SURG (General Surgery), IM (Internal Medicine), NEURO (Neurology), ONC (Oncology), ORTHO (Orthopedics), PEDS (Pediatrics).
+	column 'Department Code'
+		dataType: string
+		lineageTag: 525ea63d-0bba-4194-b4de-251876f48ae1
+		summarizeBy: none
+		sourceColumn: Department Code
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Higher-level grouping of departments: Medical Specialties (Cardiology, Gastroenterology, Neurology, Oncology), Surgical Services (General Surgery, Orthopedics), Primary Care (Family Medicine, Internal Medicine, Pediatrics), and Emergency Services (Emergency Medicine).
+	column 'Service Line'
+		dataType: string
+		lineageTag: b111721d-de47-4ac2-b47f-2e94df5120c2
+		summarizeBy: none
+		sourceColumn: Service Line
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Display name of the facility, hospital, or care site where the department operates and the encounter occurred, formatted Facility 001 through Facility 250.
+	column 'Facility Name'
+		dataType: string
+		lineageTag: c4849c4a-f297-4cbf-9c22-f49a94053e43
+		summarizeBy: none
+		sourceColumn: Facility Name
+
+	/// Care-site classification of the facility: Academic Medical Center, Community Hospital, Ambulatory Surgery Center, Outpatient Clinic, or Urgent Care Center.
+	column 'Facility Type'
+		dataType: string
+		lineageTag: 8d69c5a2-bce9-4a97-b4af-5e0636f008ec
+		summarizeBy: none
+		sourceColumn: Facility Type
+
+	/// City in which the facility is located. Use for care-delivery geography.
+	column 'Facility City'
+		dataType: string
+		lineageTag: 3a637eee-ae1e-42cc-852f-7511353a7ae0
+		dataCategory: City
+		summarizeBy: none
+		sourceColumn: Facility City
+
+	/// U.S. state in which the facility is located. Use for where care was delivered; for where patients live use Patient State.
+	column 'Facility State'
+		dataType: string
+		lineageTag: d97dca80-7426-49df-bd88-db7aed42c7d1
+		dataCategory: StateOrProvince
+		summarizeBy: none
+		sourceColumn: Facility State
+
+	/// Unique label for one department at one facility, formatted "<Department Name> - <Facility Name>" (for example "Cardiology - Facility 012"). Use when a single department-at-facility unit must be identified.
+	column 'Facility Department'
+		dataType: string
+		lineageTag: 4617a8ec-54b2-4b81-b7dc-7bfb3e871efa
+		isDefaultLabel
+		summarizeBy: none
+		sourceColumn: Facility Department
+
+	/// Organizational drill path from Service Line to Department Name to the individual department at a facility.
+	hierarchy 'Department Hierarchy'
+		lineageTag: bd597ede-620a-45a4-9e74-3d823d7d06bd
+
+		level 'Service Line'
+			lineageTag: 09f885fb-9307-4b7c-8de6-0fbd482c8e0b
+			column: 'Service Line'
+
+		level 'Department Name'
+			lineageTag: dfd9e844-b6a7-4a61-bfd3-d3ea4c87a1db
+			column: 'Department Name'
+
+		level 'Facility Department'
+			lineageTag: d3a165f9-4582-4899-9651-cff1bfb61eb0
+			column: 'Facility Department'
+
+	/// Geographic drill path for where care was delivered: Facility State, then Facility City, then Facility Name, then the department at that facility.
+	hierarchy 'Facility Geography'
+		lineageTag: af87af69-57d5-466e-9ac9-3dd2f471d84b
+
+		level 'Facility State'
+			lineageTag: dcd3bdf1-891b-4da0-ac73-c09755dc7ea0
+			column: 'Facility State'
+
+		level 'Facility City'
+			lineageTag: a3978e6c-11c8-4bb6-a72e-572d4a4fef1e
+			column: 'Facility City'
+
+		level 'Facility Name'
+			lineageTag: 6043ee9a-c1ee-4b59-a461-03c7dad96e6c
+			column: 'Facility Name'
+
+		level 'Facility Department'
+			lineageTag: bed380b9-c415-459d-8747-1fea507fc60e
+			column: 'Facility Department'
+
+	partition Department = m
+		mode: import
+		source =
+				let
+				    Departments = {
+				        [Name = "Cardiology", Code = "CARD", Line = "Medical Specialties"],
+				        [Name = "Emergency Medicine", Code = "ED", Line = "Emergency Services"],
+				        [Name = "Family Medicine", Code = "FM", Line = "Primary Care"],
+				        [Name = "Gastroenterology", Code = "GI", Line = "Medical Specialties"],
+				        [Name = "General Surgery", Code = "SURG", Line = "Surgical Services"],
+				        [Name = "Internal Medicine", Code = "IM", Line = "Primary Care"],
+				        [Name = "Neurology", Code = "NEURO", Line = "Medical Specialties"],
+				        [Name = "Oncology", Code = "ONC", Line = "Medical Specialties"],
+				        [Name = "Orthopedics", Code = "ORTHO", Line = "Surgical Services"],
+				        [Name = "Pediatrics", Code = "PEDS", Line = "Primary Care"]
+				    },
+				    FacilityCount = 250,
+				    FacilityTypes = {"Academic Medical Center", "Community Hospital", "Ambulatory Surgery Center", "Outpatient Clinic", "Urgent Care Center"},
+				    Cities = {"Boston", "Chicago", "Columbus", "Dallas", "Los Angeles", "Miami", "Minneapolis", "New York", "Phoenix", "Seattle"},
+				    States = {"Massachusetts", "Illinois", "Ohio", "Texas", "California", "Florida", "Minnesota", "New York", "Arizona", "Washington"},
+				    // Department Key = (Facility Number - 1) * 10 + department position; the Encounters and security queries use the same formula
+				    Rows = List.Combine(List.Transform(List.Numbers(1, FacilityCount), (f) =>
+				        let
+				            FacilityName = "Facility " & Text.PadStart(Text.From(f), 3, "0"),
+				            Region = Number.Mod(Number.IntegerDivide(f - 1, 5), 10)
+				        in
+				            List.Transform(List.Numbers(1, 10), (d) =>
+				                let dept = Departments{d - 1}
+				                in {(f - 1) * 10 + d, dept[Name], dept[Code], dept[Line], FacilityName, FacilityTypes{Number.Mod(f - 1, 5)}, Cities{Region}, States{Region}, dept[Name] & " - " & FacilityName}))),
+				    Result = Table.FromRows(Rows, type table [
+				        #"Department Key" = Int64.Type, #"Department Name" = text, #"Department Code" = text, #"Service Line" = text,
+				        #"Facility Name" = text, #"Facility Type" = text, #"Facility City" = text, #"Facility State" = text, #"Facility Department" = text
+				    ])
+				in
+				    Result
+
+	annotation PBI_ResultType = Table
+

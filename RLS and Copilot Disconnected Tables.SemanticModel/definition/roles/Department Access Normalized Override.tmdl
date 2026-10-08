@@ -1,0 +1,26 @@
+role 'Department Access Normalized Override'
+	modelPermission: read
+
+	tablePermission Department =
+			-- Role filter on 'Department'
+			VAR _user = USERPRINCIPALNAME()
+			VAR _hasAllAccess =
+			    NOT ISEMPTY(CALCULATETABLE('User Department Access (Override)',
+			        'User Department Access (Override)'[User Email] = _user,
+			        'User Department Access (Override)'[All Access] = TRUE()))
+			VAR _allowedDepartments =
+			    CALCULATETABLE(VALUES('User Department Access (Override)'[Granted Department Key]),
+			        'User Department Access (Override)'[User Email] = _user)
+			RETURN
+			    _hasAllAccess || 'Department'[Department Key] IN _allowedDepartments
+
+	tablePermission 'User Department Access' = 'User Department Access'[User Email] = USERPRINCIPALNAME()
+
+	tablePermission 'User Department Access (Delimited Override)' = 'User Department Access (Delimited Override)'[User Email] = USERPRINCIPALNAME()
+
+	tablePermission 'User Department Access (Delimited)' = 'User Department Access (Delimited)'[User Email] = USERPRINCIPALNAME()
+
+	tablePermission 'User Department Access (Override)' = 'User Department Access (Override)'[User Email] = USERPRINCIPALNAME()
+
+	annotation PBI_Id = 8ecad6a72edc4bc1a4a8caf46081201d
+

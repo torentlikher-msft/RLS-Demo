@@ -1,0 +1,25 @@
+role 'Department Access Delimited Override'
+	modelPermission: read
+
+	tablePermission Department =
+			-- Role filter on 'Department'
+			VAR _user = USERPRINCIPALNAME()
+			VAR _hasAllAccess =
+			    COALESCE(LOOKUPVALUE('User Department Access (Delimited Override)'[All Access],
+			        'User Department Access (Delimited Override)'[User Email], _user), FALSE())
+			VAR _departmentKeys =
+			    LOOKUPVALUE('User Department Access (Delimited Override)'[Department Keys],
+			        'User Department Access (Delimited Override)'[User Email], _user)
+			RETURN
+			    _hasAllAccess || PATHCONTAINS(_departmentKeys, 'Department'[Department Key])
+
+	tablePermission 'User Department Access' = 'User Department Access'[User Email] = USERPRINCIPALNAME()
+
+	tablePermission 'User Department Access (Delimited Override)' = 'User Department Access (Delimited Override)'[User Email] = USERPRINCIPALNAME()
+
+	tablePermission 'User Department Access (Delimited)' = 'User Department Access (Delimited)'[User Email] = USERPRINCIPALNAME()
+
+	tablePermission 'User Department Access (Override)' = 'User Department Access (Override)'[User Email] = USERPRINCIPALNAME()
+
+	annotation PBI_Id = 79ea1884c87a4b829d242931a44f6789
+

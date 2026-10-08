@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "RLS and Copilot Active Relationship"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "cfffac5c-2c12-4248-aec1-211e637388e9"
+  }
+}

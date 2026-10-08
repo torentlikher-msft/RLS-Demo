@@ -1,0 +1,6 @@
+/// Controls the number of synthetic rows generated in the Encounters fact table during refresh (originally 50,000). Change to any positive whole number and refresh to scale the model; the Patient dimension scales automatically at one patient per 100 encounters. Data is generated from a fixed random seed, so the same value always produces the same data. Very large values increase refresh time and memory use.
+expression 'Encounter Row Count' = "10000" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: c40b6499-a8ae-4304-a166-53cc0809dcc7
+
+	annotation PBI_ResultType = Text
+

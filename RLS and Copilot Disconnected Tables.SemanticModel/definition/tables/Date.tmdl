@@ -1,0 +1,133 @@
+/// Conformed calendar dimension used to analyze encounters by service date. Contains one row per calendar day from January 1, 2022 through December 31, 2026 and supports year, quarter, month, and weekday analysis. Marked as the model date table for time intelligence.
+table Date
+	lineageTag: fcded7e7-a616-407e-a727-2b7e785ce111
+	dataCategory: Time
+
+	/// Integer surrogate key in YYYYMMDD form used only to relate the Date dimension to Encounters. Hidden because users should filter with the Date column or calendar attributes.
+	column 'Date Key'
+		dataType: int64
+		isHidden
+		isUnique
+		lineageTag: de5d4c4e-58b6-4a23-b292-0cded1dce17c
+		summarizeBy: none
+		sourceColumn: Date Key
+
+	/// Calendar date on which an encounter occurred (service date). Use this field for daily trends and as the basis for time-intelligence calculations such as year to date and prior year.
+	column Date
+		dataType: dateTime
+		isUnique
+		formatString: Short Date
+		lineageTag: ff6a1348-a8a7-4486-9a5e-c86f4e8fd740
+		isDefaultLabel
+		summarizeBy: none
+		sourceColumn: Date
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	/// Four-digit calendar year of the encounter service date, for example 2025.
+	column Year
+		dataType: int64
+		lineageTag: f35cc472-84d0-4948-b04f-0d160505752a
+		summarizeBy: none
+		sourceColumn: Year
+
+	/// Numeric calendar quarter from 1 through 4, used to sort quarter labels.
+	column 'Quarter Number'
+		dataType: int64
+		isHidden
+		lineageTag: fd328e03-02ec-4ea6-b1ef-c1a35f462755
+		summarizeBy: none
+		sourceColumn: Quarter Number
+
+	/// Calendar quarter label Q1 through Q4. Combine with Year for a specific quarter.
+	column Quarter
+		dataType: string
+		lineageTag: 3ed5a7c4-b5ae-4aa2-a8e9-0b960abb7205
+		sourceColumn: Quarter
+		sortByColumn: 'Quarter Number'
+
+	/// Numeric calendar month from 1 through 12, used to sort month names chronologically.
+	column 'Month Number'
+		dataType: int64
+		isHidden
+		lineageTag: 2374c368-2f9a-4fde-998d-b32a799b1db6
+		summarizeBy: none
+		sourceColumn: Month Number
+
+	/// Full calendar month name (January through December) for monthly encounter trend analysis. Combine with Year for a specific month.
+	column Month
+		dataType: string
+		lineageTag: 6dad4841-7b1c-43e6-beec-9311ec7a9fd2
+		sourceColumn: Month
+		sortByColumn: 'Month Number'
+
+	/// Day number within the month, ranging from 1 through 31.
+	column Day
+		dataType: int64
+		lineageTag: 02465b8e-7647-4135-b341-7ceb055bc482
+		summarizeBy: none
+		sourceColumn: Day
+
+	/// Weekday sequence where Monday is 1 and Sunday is 7, used to sort weekday names.
+	column 'Day of Week Number'
+		dataType: int64
+		isHidden
+		lineageTag: 04edafcb-e80f-441e-95c1-d63f03e4efcb
+		summarizeBy: none
+		sourceColumn: Day of Week Number
+
+	/// Full weekday name (Monday through Sunday) for identifying weekly patterns in encounter demand.
+	column 'Day of Week'
+		dataType: string
+		lineageTag: 6cb0d270-1d44-430d-b891-a2e1a6cc8762
+		sourceColumn: Day of Week
+		sortByColumn: 'Day of Week Number'
+
+	/// Yes when the service date falls on Saturday or Sunday, otherwise No. Use to compare weekend versus weekday encounter volume.
+	column 'Is Weekend'
+		dataType: string
+		lineageTag: c54ec756-95e1-4ead-9b73-e3a84524f104
+		sourceColumn: Is Weekend
+
+	/// Standard calendar drill path for encounter trends: Year, then Quarter, then Month, then individual Date.
+	hierarchy Calendar
+		lineageTag: fbf61c0d-5783-4537-ba99-d6fa859b3210
+
+		level Year
+			lineageTag: 8d9c844c-80ce-4744-880f-b6d646075f3e
+			column: Year
+
+		level Quarter
+			lineageTag: 63455ad3-dca0-4a8d-88c9-3db3b0503221
+			column: Quarter
+
+		level Month
+			lineageTag: 052a3b31-63ec-40ea-8ca8-6c535dfad9da
+			column: Month
+
+		level Date
+			lineageTag: bd2dc568-5bee-4812-a374-5d021853dee7
+			column: Date
+
+	partition Date = m
+		mode: import
+		source =
+				let
+				    StartDate = #date(2022, 1, 1),
+				    EndDate = #date(2026, 12, 31),
+				    Dates = List.Dates(StartDate, Duration.Days(EndDate - StartDate) + 1, #duration(1, 0, 0, 0)),
+				    Source = Table.FromList(Dates, Splitter.SplitByNothing(), {"Date"}),
+				    Typed = Table.TransformColumnTypes(Source, {{"Date", type date}}),
+				    AddDateKey = Table.AddColumn(Typed, "Date Key", each Date.Year([Date]) * 10000 + Date.Month([Date]) * 100 + Date.Day([Date]), Int64.Type),
+				    AddYear = Table.AddColumn(AddDateKey, "Year", each Date.Year([Date]), Int64.Type),
+				    AddQuarterNumber = Table.AddColumn(AddYear, "Quarter Number", each Date.QuarterOfYear([Date]), Int64.Type),
+				    AddQuarter = Table.AddColumn(AddQuarterNumber, "Quarter", each "Q" & Text.From([Quarter Number]), type text),
+				    AddMonthNumber = Table.AddColumn(AddQuarter, "Month Number", each Date.Month([Date]), Int64.Type),
+				    AddMonth = Table.AddColumn(AddMonthNumber, "Month", each Date.MonthName([Date]), type text),
+				    AddDay = Table.AddColumn(AddMonth, "Day", each Date.Day([Date]), Int64.Type),
+				    AddDayOfWeekNumber = Table.AddColumn(AddDay, "Day of Week Number", each Date.DayOfWeek([Date], Day.Monday) + 1, Int64.Type),
+				    AddDayOfWeek = Table.AddColumn(AddDayOfWeekNumber, "Day of Week", each Date.DayOfWeekName([Date]), type text),
+				    AddWeekend = Table.AddColumn(AddDayOfWeek, "Is Weekend", each if [Day of Week Number] >= 6 then "Yes" else "No", type text)
+				in
+				    AddWeekend
+

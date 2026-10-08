@@ -1,0 +1,64 @@
+table 'User Department Access (Delimited)'
+	lineageTag: 60f37dd2-70a9-45f0-86f6-24a927575aca
+
+	/// User principal name (UPN, typically the sign-in email address) of a person granted access. Compared against USERPRINCIPALNAME() by the Department Access (Delimited) row-level security role; matching is case-insensitive. Includes 6 named sample users plus 2,000 generated users (facility directors, department managers, regional leaders, enterprise analysts).
+	column 'User Email'
+		dataType: string
+		lineageTag: 4f812458-872e-4f43-addd-0335d96d19da
+		sourceColumn: User Email
+
+		changedProperty = IsHidden
+
+	/// Pipe-delimited list of Department Key values (department at a facility, 1 to 2,500) the user may see, sorted ascending, for example 11|12|13. Read by the Department Access (Delimited) role with LOOKUPVALUE and tested with PATHCONTAINS against Department[Department Key].
+	column 'Department Keys'
+		dataType: string
+		lineageTag: 9ef3ffd7-008c-4465-96d5-1bf293a30d1e
+		sourceColumn: Department Keys
+
+		changedProperty = IsHidden
+
+	partition 'User Department Access (Delimited)' = m
+		mode: import
+		source =
+				let
+				    FacilityCount = 250,
+				    DepartmentCount = 10,
+				    // Department Key = (Facility Number - 1) * 10 + department position (1 Cardiology ... 10 Pediatrics); matches the Department query
+				    Key = (f as number, d as number) as number => (f - 1) * DepartmentCount + d,
+				    AllFacilities = List.Numbers(1, FacilityCount),
+				    AllKeys = List.Numbers(1, FacilityCount * DepartmentCount),
+				    StateOf = (f as number) as number => Number.Mod(Number.IntegerDivide(f - 1, 5), 10),
+				    FacilitiesInState = (s as number) as list => List.Select(AllFacilities, (f) => StateOf(f) = s),
+				    DeptAcross = (depts as list, facilities as list) as list =>
+				        List.Sort(List.Combine(List.Transform(facilities, (f) => List.Transform(depts, (d) => Key(f, d))))),
+				    // Sample users referenced by the RLS Test report page
+				    SampleUsers = {
+				        {"executive@contoso.com", "All", AllKeys},
+				        {"cardiology.manager@contoso.com", "Department", DeptAcross({1}, AllFacilities)},
+				        {"usera@MngEnvMCAP249728.onmicrosoft.com", "Department", DeptAcross({1}, AllFacilities)},
+				        {"ed.director@contoso.com", "Department", DeptAcross({2}, AllFacilities)},
+				        {"primarycare.director@contoso.com", "Department", DeptAcross({3, 6, 10}, AllFacilities)},
+				        {"surgery.director@contoso.com", "Department", DeptAcross({5, 9}, AllFacilities)},
+				        {"specialty.analyst@contoso.com", "Department", DeptAcross({1, 4, 7, 8}, AllFacilities)}
+				    },
+				    // Generated users: 60% facility directors (10 keys), 20% department managers in one state (25 keys),
+				    // 17.5% regional leaders for one state (250 keys), 2.5% enterprise analysts (all 2,500 keys / all-access)
+				    GeneratedUserCount = 2000,
+				    GeneratedUser = (u as number) as list =>
+				        let
+				            Slot = Number.Mod(u, 40),
+				            Id = Text.PadStart(Text.From(u), 4, "0")
+				        in
+				            if Slot < 24 then {"facility.director." & Id & "@contoso.com", "Facility", DeptAcross(List.Numbers(1, DepartmentCount), {Number.Mod(u * 7, FacilityCount) + 1})}
+				            else if Slot < 32 then {"department.manager." & Id & "@contoso.com", "Department", DeptAcross({Number.Mod(u, DepartmentCount) + 1}, FacilitiesInState(Number.Mod(Number.IntegerDivide(u, 10), 10)))}
+				            else if Slot < 39 then {"regional.leader." & Id & "@contoso.com", "Region", DeptAcross(List.Numbers(1, DepartmentCount), FacilitiesInState(Number.Mod(u, 10)))}
+				            else {"enterprise.analyst." & Id & "@contoso.com", "All", AllKeys},
+				    Users = SampleUsers & List.Transform(List.Numbers(1, GeneratedUserCount), GeneratedUser),
+				    Result = Table.FromRows(List.Transform(Users, (x) => {x{0}, Text.Combine(List.Transform(x{2}, Text.From), "|")}), type table [#"User Email" = text, #"Department Keys" = text])
+				in
+				    Result
+
+	changedProperty = IsHidden
+
+	annotation PBI_ResultType = Table
+

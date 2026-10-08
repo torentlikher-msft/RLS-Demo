@@ -1,0 +1,258 @@
+/// Dedicated utility table that hosts all explicit DAX measures for patient encounter analytics, organized into display folders (Encounters, Patients, Providers, Facilities, Financial, Utilization, Quality, Time Intelligence). Intentionally disconnected from the star schema and contains no business data.
+table _Measures
+	lineageTag: 238cb17b-30f8-42ba-927b-a479facb6127
+
+	/// Total number of patient encounters (visits) in the current filter context. Encounters has one row per encounter, so this counts rows. This is the primary volume measure; use it for questions like 'how many encounters', 'how many visits', or 'encounter volume'.
+	measure '# Encounters' = COUNTROWS('Encounters')
+		formatString: #,0
+		displayFolder: Encounters\Counts
+		lineageTag: 625a46db-024a-4972-bc92-d5a21c8710dd
+
+	/// Number of unique patients with at least one encounter in the current filter context (distinct count of Patient Key in Encounters). A patient with several encounters counts once. Use for 'how many patients' or 'unique patients seen'.
+	measure '# Patients' = DISTINCTCOUNT('Encounters'[Patient Key])
+		formatString: #,0
+		displayFolder: Patients
+		lineageTag: 04ee42e3-a977-4238-b4ce-c48ea6ca0de1
+
+	/// Number of unique rendering providers (clinicians) who had at least one encounter in the current filter context.
+	measure '# Providers' = DISTINCTCOUNT('Encounters'[Provider Key])
+		formatString: #,0
+		displayFolder: Providers
+		lineageTag: fceee0a0-e40d-40c4-98cf-812887bfda7d
+
+	/// Number of unique facilities (care sites) where at least one encounter occurred in the current filter context. Counts distinct Facility Name values of the departments with encounters.
+	measure '# Facilities' = COUNTROWS(SUMMARIZE('Encounters', 'Department'[Facility Name]))
+		formatString: #,0
+		displayFolder: Facilities
+		lineageTag: f8cf5ae3-71ad-4623-9874-bd26eecf4290
+
+	/// Average number of encounters per unique patient: # Encounters divided by # Patients. A utilization intensity indicator; higher values mean patients return more often. Blank when there are no patients.
+	measure 'Encounters per Patient' = DIVIDE([# Encounters], [# Patients])
+		formatString: #,0.00
+		displayFolder: Patients
+		lineageTag: 850c7792-948b-4b6c-86f9-7e212bf0b925
+
+	/// Average number of encounters per provider: # Encounters divided by # Providers. Indicates provider workload or panel productivity.
+	measure 'Encounters per Provider' = DIVIDE([# Encounters], [# Providers])
+		formatString: #,0.00
+		displayFolder: Providers
+		lineageTag: 93228bd1-fa13-4d87-9f46-f812cd5af5ac
+
+	/// Number of encounters with Encounter Type = Inpatient (hospital admissions) in the current filter context. Respects any other Encounter Type filters.
+	measure '# Inpatient Encounters' =
+			CALCULATE(
+			    [# Encounters],
+			    KEEPFILTERS('Encounter Type'[Encounter Type] = "Inpatient")
+			)
+		formatString: #,0
+		displayFolder: Encounters\By Encounter Type
+		lineageTag: 66313483-0edb-440d-94be-ca461c08df76
+
+	/// Number of encounters with Encounter Type = Emergency (emergency department or ER visits) in the current filter context.
+	measure '# Emergency Encounters' =
+			CALCULATE(
+			    [# Encounters],
+			    KEEPFILTERS('Encounter Type'[Encounter Type] = "Emergency")
+			)
+		formatString: #,0
+		displayFolder: Encounters\By Encounter Type
+		lineageTag: 8743afcc-f57e-476b-a2be-6f45326c3c2b
+
+	/// Number of encounters with Encounter Type = Telehealth (virtual visits) in the current filter context.
+	measure '# Telehealth Encounters' =
+			CALCULATE(
+			    [# Encounters],
+			    KEEPFILTERS('Encounter Type'[Encounter Type] = "Telehealth")
+			)
+		formatString: #,0
+		displayFolder: Encounters\By Encounter Type
+		lineageTag: dab96fa5-1f9a-45ad-8608-eaf5cec95cce
+
+	/// Share of encounters delivered by Telehealth: # Telehealth Encounters divided by # Encounters. Indicates virtual care adoption.
+	measure 'Telehealth Share (%)' = DIVIDE([# Telehealth Encounters], [# Encounters])
+		formatString: 0.0%
+		displayFolder: Encounters\By Encounter Type
+		lineageTag: f0cf99c5-613e-4c10-a710-8eb689949d3d
+
+	/// Average encounters per calendar day across the dates in the current filter context, ignoring days with no encounters. Use for daily demand or throughput questions.
+	measure 'Average Daily Encounters' =
+			AVERAGEX(
+			    VALUES('Date'[Date]),
+			    [# Encounters]
+			)
+		formatString: #,0.00
+		displayFolder: Encounters\Averages
+		lineageTag: d1ab29ec-65b9-4910-aef5-ec5c815cf81a
+
+	/// Total synthetic allowed amount in US dollars for encounters in the current filter context. Allowed amount is the reimbursable amount accepted under the payer contract (combined payer and patient responsibility); it is not billed charges or paid amount. Use for revenue, reimbursement, or cost-of-care questions.
+	measure 'Total Allowed Amount' = SUM('Encounters'[Allowed Amount])
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Financial
+		lineageTag: ab550524-6996-403a-85a8-f3a4019b448b
+
+	/// Average allowed amount in US dollars per encounter: Total Allowed Amount divided by # Encounters. Also called average reimbursement or cost per visit.
+	measure 'Average Allowed Amount per Encounter' = DIVIDE([Total Allowed Amount], [# Encounters])
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Financial
+		lineageTag: 403a6c74-0b72-43e4-bfc0-8a847bcd2f87
+
+	/// Average allowed amount in US dollars per unique patient: Total Allowed Amount divided by # Patients. A per-patient cost-of-care indicator.
+	measure 'Allowed Amount per Patient' = DIVIDE([Total Allowed Amount], [# Patients])
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Financial
+		lineageTag: aff493ec-71b3-4e6d-9d9b-8bf2642c7783
+
+	/// Total length-of-stay days (patient days) for encounters in the current filter context. Only Inpatient and Observation encounters contribute days; all other encounter types contribute zero.
+	measure 'Total Length of Stay Days' = SUM('Encounters'[Length of Stay Days])
+		formatString: #,0
+		displayFolder: Utilization
+		lineageTag: 9a2d8f35-ddc1-4587-b529-11b5a376b8a6
+
+	/// Average length of stay (ALOS) in days for Inpatient and Observation encounters only: Total Length of Stay Days divided by the count of Inpatient and Observation encounters. Other encounter types are excluded from the denominator. Blank when no Inpatient or Observation encounters are in context.
+	measure 'Average Length of Stay Days' =
+			VAR _staysWithLength =
+			    CALCULATE(
+			        [# Encounters],
+			        KEEPFILTERS('Encounter Type'[Encounter Type] IN { "Inpatient", "Observation" })
+			    )
+			RETURN
+			    DIVIDE([Total Length of Stay Days], _staysWithLength)
+		formatString: #,0.00
+		displayFolder: Utilization
+		lineageTag: 05da9dc0-cab5-4902-aa5d-01ae1b4560c5
+
+	/// Number of encounters where Readmission Flag = Yes in the current filter context. Deterministic demonstration flag; not a CMS 30-day all-cause readmission calculation.
+	measure '# Readmission Encounters' =
+			CALCULATE(
+			    [# Encounters],
+			    KEEPFILTERS('Encounters'[Readmission Flag] = "Yes")
+			)
+		formatString: #,0
+		displayFolder: Quality
+		lineageTag: e0cd9571-667d-42ec-aaf7-a2147658ea69
+
+	/// Readmission rate: # Readmission Encounters divided by # Encounters. Lower is better. Demonstration metric only; not a regulated quality measure definition.
+	measure 'Readmission Rate (%)' = DIVIDE([# Readmission Encounters], [# Encounters])
+		formatString: 0.00%
+		displayFolder: Quality
+		lineageTag: c7d14ed3-3759-4f17-9e6e-2a3dbe1436f1
+
+	/// Number of encounters with Discharge Disposition = Expired (the patient died during the encounter).
+	measure '# Mortality Encounters' =
+			CALCULATE(
+			    [# Encounters],
+			    KEEPFILTERS('Discharge Disposition'[Discharge Disposition] = "Expired")
+			)
+		formatString: #,0
+		displayFolder: Quality
+		lineageTag: e0318d75-e74c-422a-a19c-cb152f934045
+
+	/// Mortality rate: # Mortality Encounters (Discharge Disposition = Expired) divided by # Encounters. Lower is better. Synthetic data; not risk-adjusted.
+	measure 'Mortality Rate (%)' = DIVIDE([# Mortality Encounters], [# Encounters])
+		formatString: 0.00%
+		displayFolder: Quality
+		lineageTag: c70b6247-2023-4b04-82d8-a2b7a03f946a
+
+	/// Encounter count year to date (ytd): from January 1 of the selected year through the latest date in the current filter context. Requires a Date context such as Year, Month, or Date.
+	measure '# Encounters (ytd)' =
+			CALCULATE(
+			    [# Encounters],
+			    DATESYTD('Date'[Date])
+			)
+		formatString: #,0
+		displayFolder: Time Intelligence
+		lineageTag: ae983790-3813-4961-bbf0-d1653019b922
+
+	/// Encounter count for the same period one year earlier (ly = last year / prior year). Requires a Date context.
+	measure '# Encounters (ly)' =
+			CALCULATE(
+			    [# Encounters],
+			    SAMEPERIODLASTYEAR('Date'[Date])
+			)
+		formatString: #,0
+		displayFolder: Time Intelligence
+		lineageTag: 336197a3-02d4-49f7-aed0-fc63ecdcd984
+
+	/// Year-over-year (YoY) percent change in encounter count versus the same period last year: (# Encounters - # Encounters (ly)) divided by # Encounters (ly). Blank when there is no prior-year data.
+	measure '# Encounters YoY (%)' =
+			VAR _current = [# Encounters]
+			VAR _priorYear = [# Encounters (ly)]
+			RETURN
+			    IF(NOT ISBLANK(_current), DIVIDE(_current - _priorYear, _priorYear))
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Time Intelligence
+		lineageTag: f231552f-5ba6-4bf8-8b46-b4d2bb20c0e2
+
+	/// Total Allowed Amount year to date (ytd): from January 1 of the selected year through the latest date in the current filter context. Requires a Date context.
+	measure 'Total Allowed Amount (ytd)' =
+			CALCULATE(
+			    [Total Allowed Amount],
+			    DATESYTD('Date'[Date])
+			)
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time Intelligence
+		lineageTag: 4664c852-13b6-40b8-8dd4-d00fcb3ff421
+
+	/// Total Allowed Amount for the same period one year earlier (ly = last year / prior year). Requires a Date context.
+	measure 'Total Allowed Amount (ly)' =
+			CALCULATE(
+			    [Total Allowed Amount],
+			    SAMEPERIODLASTYEAR('Date'[Date])
+			)
+		formatString: \$#,0;(\$#,0);\$#,0
+		displayFolder: Time Intelligence
+		lineageTag: db7a50c2-3f39-4a1c-bff4-f5602b70251e
+
+	/// Year-over-year (YoY) percent change in Total Allowed Amount versus the same period last year. Blank when there is no prior-year data.
+	measure 'Total Allowed Amount YoY (%)' =
+			VAR _current = [Total Allowed Amount]
+			VAR _priorYear = [Total Allowed Amount (ly)]
+			RETURN
+			    IF(NOT ISBLANK(_current), DIVIDE(_current - _priorYear, _priorYear))
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Time Intelligence
+		lineageTag: 23f26d40-22a4-4292-b1ad-30256d73f742
+
+	/// Number of unique clinical departments (specialties such as Cardiology or Pediatrics) with at least one encounter in the current filter context, regardless of how many facilities they operate at (maximum 10). Under row-level security this reflects only the departments the signed-in user may see. Use # Facility Departments to count department-at-facility units.
+	measure '# Departments' = COUNTROWS(SUMMARIZE('Encounters', 'Department'[Department Name]))
+		formatString: #,0
+		displayFolder: Departments
+		lineageTag: 7555d173-2fca-4f0b-be41-95b4b8a4cf02
+
+	/// User principal name (sign-in email) of the person viewing the report, as returned by USERPRINCIPALNAME(). This is the identity the Department Access row-level security role matches against User Department Access. In Desktop 'View as' testing it returns the impersonated user; in Desktop without impersonation it may return the Windows DOMAIN\user or the signed-in account.
+	measure 'Current User' = USERPRINCIPALNAME()
+		displayFolder: Security
+		lineageTag: 4559606c-8ec2-4920-af64-4468357547c8
+
+	/// Comma-separated, alphabetical list of department names visible in the current filter context. Under the Department Access row-level security role, this shows exactly which departments the signed-in user is permitted to see. Returns 'None' when no departments are visible.
+	measure 'Visible Departments' =
+			VAR _departments =
+			    CONCATENATEX(
+			        VALUES('Department'[Department Name]),
+			        'Department'[Department Name],
+			        ", ",
+			        'Department'[Department Name], ASC
+			    )
+			RETURN
+			    IF(ISBLANK(_departments) || _departments = "", "None", _departments)
+		displayFolder: Security
+		lineageTag: 13c6abd0-9a12-47fe-b41f-2e3c1fb046d7
+
+	/// Number of unique department-at-facility units (one clinical department at one facility, up to 2,500) with at least one encounter in the current filter context. Under row-level security this reflects the exact department-at-facility keys the signed-in user may see.
+	measure '# Facility Departments' = DISTINCTCOUNT('Encounters'[Department Key])
+		formatString: #,0
+		displayFolder: Departments
+		lineageTag: 18e6cbe5-6386-4d97-9f0e-d0afa3566a53
+
+	/// Technical single-row placeholder column required to host the _Measures table. No analytical meaning.
+	column 'Measure Table Key'
+		dataType: int64
+		isHidden
+		lineageTag: 8d14935a-1c98-4643-a172-2901a7d87e24
+		summarizeBy: none
+		sourceColumn: Measure Table Key
+
+	partition _Measures = m
+		mode: import
+		source = #table(type table [#"Measure Table Key" = Int64.Type], {{1}})
+

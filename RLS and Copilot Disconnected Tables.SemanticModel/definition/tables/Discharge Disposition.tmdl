@@ -1,0 +1,24 @@
+/// Discharge disposition dimension at one row per outcome category (6 values). Describes where the patient went or their status when the encounter ended, for analysis of post-acute care, transfers, and mortality.
+table 'Discharge Disposition'
+	lineageTag: 8ae3cb0f-41b9-4f25-9a6a-684d53623faa
+
+	/// Discharge disposition surrogate key used only to relate Discharge Disposition to Encounters.
+	column 'Discharge Disposition Key'
+		dataType: int64
+		isHidden
+		isUnique
+		lineageTag: 22d5b1f8-029d-4a7a-9a56-bacaf06c3619
+		summarizeBy: none
+		sourceColumn: Discharge Disposition Key
+
+	/// Patient destination or status at encounter end: Home or Self Care (routine discharge), Skilled Nursing Facility (SNF), Home Health Service, Transferred to Acute Care, Against Medical Advice (AMA, left before discharge), or Expired (patient died).
+	column 'Discharge Disposition'
+		dataType: string
+		lineageTag: 86a9d948-4878-45df-ba67-bcb053b1ee4b
+		isDefaultLabel
+		sourceColumn: Discharge Disposition
+
+	partition 'Discharge Disposition' = m
+		mode: import
+		source = #table(type table [#"Discharge Disposition Key" = Int64.Type, #"Discharge Disposition" = text], {{1, "Home or Self Care"}, {2, "Skilled Nursing Facility"}, {3, "Home Health Service"}, {4, "Transferred to Acute Care"}, {5, "Against Medical Advice"}, {6, "Expired"}})
+

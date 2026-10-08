@@ -1,0 +1,37 @@
+/// Payer (insurer) dimension at one row per synthetic health plan (20 plans). Use it to compare encounters, allowed amounts, and utilization by health plan and by coverage type such as Commercial, Medicare, or Medicaid.
+table Payer
+	lineageTag: b03f914e-88e9-4a79-926f-fe5c32ad7938
+
+	/// Synthetic payer surrogate key used only to relate Payer to Encounters.
+	column 'Payer Key'
+		dataType: int64
+		isHidden
+		isUnique
+		lineageTag: c7d15e8c-33cd-4cc3-b7e0-2959c92daa8f
+		summarizeBy: none
+		sourceColumn: Payer Key
+
+	/// Name of the health plan, insurer, or payer financially responsible for the encounter, formatted Health Plan 01 through Health Plan 20.
+	column 'Payer Name'
+		dataType: string
+		lineageTag: febc914b-457b-47b6-9f32-ca8ca93cdaac
+		isDefaultLabel
+		sourceColumn: Payer Name
+
+	/// Coverage category, also called payer mix or insurance type: Commercial (private insurance), Medicaid, Medicare, Self-Pay (uninsured), or Other Government.
+	column 'Payer Type'
+		dataType: string
+		lineageTag: 02aded23-15c3-4072-b280-b5180371c0a3
+		sourceColumn: Payer Type
+
+	partition Payer = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromList(List.Numbers(1, 20), Splitter.SplitByNothing(), {"Payer Key"}),
+				    Typed = Table.TransformColumnTypes(Source, {{"Payer Key", Int64.Type}}),
+				    AddPayer = Table.AddColumn(Typed, "Payer Name", each "Health Plan " & Text.PadStart(Text.From([Payer Key]), 2, "0"), type text),
+				    AddType = Table.AddColumn(AddPayer, "Payer Type", each {"Commercial", "Medicaid", "Medicare", "Self-Pay", "Other Government"}{Number.Mod([Payer Key] - 1, 5)}, type text)
+				in
+				    AddType
+

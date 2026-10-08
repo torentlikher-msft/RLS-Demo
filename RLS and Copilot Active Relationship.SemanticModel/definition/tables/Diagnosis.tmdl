@@ -1,0 +1,56 @@
+/// Primary diagnosis dimension at one row per synthetic diagnosis code (100 codes) grouped into 10 clinical categories. Supports encounter analysis by diagnosis and clinical category (condition group). Codes are illustrative and are not valid ICD-10-CM codes.
+table Diagnosis
+	lineageTag: 9fbd2e82-d24f-4073-8f64-1911c84fe8ba
+
+	/// Synthetic diagnosis surrogate key used only to relate Diagnosis to Encounters.
+	column 'Diagnosis Key'
+		dataType: int64
+		isHidden
+		isUnique
+		lineageTag: 8b1b7b9c-f983-4081-af8e-fa6711ff82e4
+		summarizeBy: none
+		sourceColumn: Diagnosis Key
+
+	/// Synthetic primary diagnosis code formatted DX001 through DX100. For demonstration only; must not be interpreted as an ICD-10-CM (International Classification of Diseases, 10th Revision, Clinical Modification) code.
+	column 'Diagnosis Code'
+		dataType: string
+		lineageTag: 8955496e-7a8c-4d41-aaf1-9a0a4c4f2304
+		sourceColumn: Diagnosis Code
+
+	/// Plain-language label of the primary diagnosis (reason for visit) assigned to the encounter.
+	column 'Diagnosis Description'
+		dataType: string
+		lineageTag: 8a624385-4adf-46e6-829a-b605a9fa75a5
+		isDefaultLabel
+		sourceColumn: Diagnosis Description
+
+	/// Broad clinical grouping of the primary diagnosis, also called condition group or service line: Cardiovascular, Digestive, Endocrine, Infectious Disease, Injury, Mental Health, Musculoskeletal, Neurological, Oncology, or Respiratory.
+	column 'Clinical Category'
+		dataType: string
+		lineageTag: 3fd32592-2ded-49a7-9fb1-c9405f726e0c
+		sourceColumn: Clinical Category
+
+	/// Clinical drill path from broad Clinical Category down to the individual Diagnosis Description.
+	hierarchy 'Diagnosis Hierarchy'
+		lineageTag: 83f98548-f309-437e-af73-a939a3728189
+
+		level 'Clinical Category'
+			lineageTag: 6b2eb92b-a002-4dcc-8f87-9f45a1167883
+			column: 'Clinical Category'
+
+		level 'Diagnosis Description'
+			lineageTag: e36f5f5b-7e14-47f1-9c85-6c5df00a3645
+			column: 'Diagnosis Description'
+
+	partition Diagnosis = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromList(List.Numbers(1, 100), Splitter.SplitByNothing(), {"Diagnosis Key"}),
+				    Typed = Table.TransformColumnTypes(Source, {{"Diagnosis Key", Int64.Type}}),
+				    AddCode = Table.AddColumn(Typed, "Diagnosis Code", each "DX" & Text.PadStart(Text.From([Diagnosis Key]), 3, "0"), type text),
+				    AddDescription = Table.AddColumn(AddCode, "Diagnosis Description", each "Synthetic condition " & Text.PadStart(Text.From([Diagnosis Key]), 3, "0"), type text),
+				    AddCategory = Table.AddColumn(AddDescription, "Clinical Category", each {"Cardiovascular", "Digestive", "Endocrine", "Infectious Disease", "Injury", "Mental Health", "Musculoskeletal", "Neurological", "Oncology", "Respiratory"}{Number.Mod([Diagnosis Key] - 1, 10)}, type text)
+				in
+				    AddCategory
+
